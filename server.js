@@ -1,10 +1,6 @@
 import { WebSocketServer } from "ws";
 
-const wss = new WebSocketServer({
-  port: process.env.PORT || 8080
-});
-
-console.log("WS running");
+const wss = new WebSocketServer({ port: process.env.PORT || 8080 });
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
@@ -19,6 +15,8 @@ function broadcast(data) {
 wss.on("connection", (ws) => {
   console.log("user joined");
 
+  ws.isAlive = true;
+
   broadcast({ type: "user_joined" });
 
   ws.on("message", (msg) => {
@@ -28,9 +26,12 @@ wss.on("connection", (ws) => {
       if (data.type === "pulse") {
         broadcast({ type: "pulse" });
       }
-    } catch (e) {
-      console.error(e);
-    }
+
+      if (data.type === "ping") {
+        ws.isAlive = true;
+      }
+
+    } catch (e) {}
   });
 
   ws.on("close", () => {
@@ -38,3 +39,16 @@ wss.on("connection", (ws) => {
     broadcast({ type: "user_left" });
   });
 });
+
+// 🔥 heartbeat (TO DODAJ NA SAMYM DOLE PLIKU)
+setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (!ws.isAlive) {
+      ws.terminate();
+      return;
+    }
+
+    ws.isAlive = false;
+    ws.send(JSON.stringify({ type: "ping" }));
+  });
+}, 30000);
